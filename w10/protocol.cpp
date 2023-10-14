@@ -8,21 +8,32 @@
 
 static uint32_t xorCipherKey = 0;
 
-void send_join(ENetPeer *peer)
+void send_join(ENetPeer *peer, uint8_t name_len, const char* name)
 {
-  ENetPacket *packet = enet_packet_create(nullptr, sizeof(uint8_t), ENET_PACKET_FLAG_RELIABLE);
-  *packet->data = E_CLIENT_TO_SERVER_JOIN;
+  ENetPacket *packet = enet_packet_create(nullptr, sizeof(uint8_t) + sizeof(uint8_t) + sizeof(char) * name_len,
+      ENET_PACKET_FLAG_RELIABLE);
+  Bitstream bs(packet->data);
+  bs.writeRaw(E_CLIENT_TO_SERVER_JOIN);
+  bs.writeRaw(name_len);
+  for (int i = 0; i < name_len; i++)
+      bs.writeRaw(name[i]);
 
   enet_peer_send(peer, 0, packet);
 }
 
 void send_new_entity(ENetPeer *peer, const Entity &ent)
 {
-  ENetPacket *packet = enet_packet_create(nullptr, sizeof(uint8_t) + sizeof(Entity),
+  ENetPacket *packet = enet_packet_create(nullptr, sizeof(uint8_t) + sizeof(ent),
                                                    ENET_PACKET_FLAG_RELIABLE);
   Bitstream bs(packet->data);
   bs.writeRaw(E_SERVER_TO_CLIENT_NEW_ENTITY);
-  bs.writeRaw(ent);
+  bs.writeRaw(ent.eid);
+  bs.writeRaw(ent.color);
+  uint8_t len = ent.name.length();
+  bs.writeRaw(len);
+
+  for (int i = 0; i < len; i++)
+      bs.writeRaw(ent.name[i]);
 
   enet_peer_send(peer, 0, packet);
 }
@@ -111,7 +122,18 @@ void deserialize_new_entity(ENetPacket *packet, Entity &ent)
   Bitstream bs(packet->data);
   MessageType mt;
   bs.readRaw(mt);
-  bs.readRaw(ent);
+  bs.readRaw(ent.eid);
+  bs.readRaw(ent.color);
+  uint8_t len;
+  bs.readRaw(len);
+  std::string name = "";
+  char c;
+  for (int i = 0; i < len; i++)
+  {
+      bs.readRaw(c);
+      name.push_back(c);
+  }
+  ent.name = name;
 }
 
 void deserialize_set_controlled_entity(ENetPacket *packet, uint16_t &eid)

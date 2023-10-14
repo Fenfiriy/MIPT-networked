@@ -2,6 +2,7 @@
 #include "entity.h"
 #include "protocol.h"
 #include "mathUtils.h"
+#include "bitstream.h"
 #include "server.h"
 #include <random>
 
@@ -19,6 +20,20 @@ void usleep(__int64 usec)
 
 void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
 {
+
+    Bitstream bs(packet->data);
+    MessageType mt;
+    bs.readRaw(mt);
+    uint8_t len;
+    bs.readRaw(len);
+    std::string name = "";
+    char c;
+    for (int i = 0; i < len; i++)
+    {
+        bs.readRaw(c);
+        name.push_back(c);
+    }
+
   // send all entities
   for (const Entity &ent : entities)
     send_new_entity(peer, ent);
@@ -35,12 +50,12 @@ void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
                    0x000000ff;
   uint8_t x = (rand() % 4) * 4 + 10;
   uint8_t y = (rand() % 4) * 4 + 10;
-  Entity ent = { color, newEid, vec2int{x, y} };
+  Entity ent = { color, newEid, vec2int{x, y}, name };
   entities.push_back(ent);
 
   controlledMap[newEid] = peer;
 
-  printf("Assigned eid %u\n", newEid);
+  printf("Assigned eid %u\n Name %s", newEid, name.c_str());
 
   // send info about new entity to everyone
   for (size_t i = 0; i < host->peerCount; ++i)
@@ -185,9 +200,6 @@ int main(int argc, const char **argv)
             }
         }
 
-
-
-        //printf("Entity %i in pos %i %i\n", e.eid, e.posHead.x, e.posHead.y);
         vec2int p = move(e.posHead, e.dir);
         if (p.x >= FIELD_SIZE || p.y >= FIELD_SIZE)
             respawn(e);

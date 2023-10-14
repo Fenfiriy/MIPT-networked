@@ -63,8 +63,8 @@ int main(int argc, const char **argv)
   }
 
   printf("Insert name:\n");
-  char tmp[21];
-  scanf("%20s", tmp);
+  char tmp[201];
+  scanf("%200s", tmp);
   std::string name = tmp;
 
   ENetHost *client = enet_host_create(nullptr, 1, 2, 0, 0);
@@ -129,7 +129,7 @@ int main(int argc, const char **argv)
       {
       case ENET_EVENT_TYPE_CONNECT:
         printf("Connection with %x:%u established\n", event.peer->address.host, event.peer->address.port);
-        send_join(serverPeer);
+        send_join(serverPeer, name.length(), name.c_str());
         connected = true;
         break;
       case ENET_EVENT_TYPE_RECEIVE:
@@ -206,7 +206,7 @@ int main(int argc, const char **argv)
         for (const Entity& e : entities)
         {
             colors[e.eid] = GetColor(e.color);
-            DrawText(std::to_string(e.length).c_str(), FIELD_SIZE + 2, 8 * k + 2, 1, GetColor(e.color));
+            DrawText((e.name + " " + std::to_string(e.length)).c_str(), FIELD_SIZE + 2, 8 * k + 2, 1, GetColor(e.color));
             k++;
         }
 

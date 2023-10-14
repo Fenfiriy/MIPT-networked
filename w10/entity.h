@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <vector>
 #include "quantisation.h"
+#include <string>
 
 enum MoveDirection : uint8_t
 {
@@ -21,6 +22,8 @@ struct Entity
 	uint16_t eid = invalid_entity;
 
 	vec2int posHead;
+
+	std::string name;
 	MoveDirection dir = RIGHT;
 
 	uint8_t length = 1;

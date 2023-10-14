@@ -14,7 +14,7 @@ enum MessageType : uint8_t
   E_SERVER_TO_CLIENT_KEY
 };
 
-void send_join(ENetPeer *peer);
+void send_join(ENetPeer* peer, uint8_t name_len, const char* name);
 void send_new_entity(ENetPeer *peer, const Entity &ent);
 void send_set_controlled_entity(ENetPeer *peer, uint16_t eid);
 void send_cipher_key(ENetPeer *peer, uint32_t key);
