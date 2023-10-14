@@ -169,19 +169,16 @@ int main(int argc, const char **argv)
             // Update
             int y = (up ? 1 : 0) + (down ? -1 : 0);
             int x = (left ? -1 : 0) + (right ? 1 : 0);
-            printf("dir %d\n", e.dir);
             // Send
             if (e.dir == UP || e.dir == DOWN)
             {
                 if (x > 0)
                 {
                     send_entity_input(serverPeer, my_entity, RIGHT);
-                    printf("RIGHT\n");
                 }
                 if (x < 0)
                 {
                     send_entity_input(serverPeer, my_entity, LEFT);
-                    printf("LEFT\n");
                 }
             }                
             else
@@ -189,12 +186,10 @@ int main(int argc, const char **argv)
                 if (y > 0)
                 {
                     send_entity_input(serverPeer, my_entity, UP);
-                    printf("UP\n");
                 }
                 if (y < 0)
                 {
                     send_entity_input(serverPeer, my_entity, DOWN);
-                    printf("DOWN\n");
                 }
             }
         }

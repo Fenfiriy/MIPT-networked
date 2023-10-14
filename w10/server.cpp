@@ -63,7 +63,6 @@ void on_input(ENetPacket *packet)
   for (Entity &e : entities)
     if (e.eid == eid)
     {
-        printf("Input %d %d\n", e.dir, opposite(dir));
         if (e.dir != opposite(dir))
         {
             e.dir = dir;
@@ -97,10 +96,7 @@ int main(int argc, const char **argv)
       for (int j = 0; j < FIELD_SIZE; j++)
       {
           fieldState[i].push_back({ invalid_entity, 0 });
-          printf("0 ");
       }
-
-      printf("\n");
   }
 
   printf("Field %d x %d created\n", fieldState.size(), fieldState[0].size());
