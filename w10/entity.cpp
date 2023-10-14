@@ -1,14 +1,69 @@
 #include "entity.h"
 #include "mathUtils.h"
 
-void simulate_entity(Entity &e, float dt)
+
+MoveDirection opposite(MoveDirection dir)
 {
-  bool isBraking = sign(e.thr) != 0.f && sign(e.thr) != sign(e.speed);
-  float accel = isBraking ? 12.f : 3.f;
-  e.speed = move_to(e.speed, clamp(e.thr, -0.3, 1.f) * 10.f, dt, accel);
-  e.ori += e.steer * dt * clamp(e.speed, -2.f, 2.f) * 0.3f;
-  e.ori = e.ori + (e.ori > PI ? -2.f * PI : e.ori < -PI ? 2.f * PI : 0.f);
-  e.x += cosf(e.ori) * e.speed * dt;
-  e.y += sinf(e.ori) * e.speed * dt;
+	switch (dir)
+	{
+	case UP:
+		return DOWN;
+	case DOWN:
+		return UP;
+	case LEFT:
+		return RIGHT;
+	case RIGHT:
+		return LEFT;
+	default:
+		break;
+	}
 }
 
+void simulate_entity(Entity &e, std::pair<uint16_t, uint8_t> p)
+{
+	uint16_t eid = p.first;
+	uint8_t last_visited = p.second;
+	switch (eid)
+	{
+	case server_entity:
+		e.length++;
+	case invalid_entity:
+		e.posHead = move(e.posHead, e.dir);
+		break;
+	default:
+		respawn(e);
+		break;
+	}
+}
+
+vec2int move(vec2int pos, MoveDirection dir)
+{
+	vec2int newpos = pos;
+	switch (dir)
+	{
+	case UP:
+		newpos.y--;
+		break;
+	case DOWN:
+		newpos.y++;
+		break;
+	case LEFT:
+		newpos.x--;
+		break;
+	case RIGHT:
+		newpos.x++;
+		break;
+	default:
+		break;
+	}
+
+	return newpos;
+}
+
+void respawn(Entity& e)
+{
+	uint8_t x = (rand() % 4) * 4 + 10;
+	uint8_t y = (rand() % 4) * 4 + 10;
+	e.posHead = vec2int{ x, y };
+	e.length = 1;
+}

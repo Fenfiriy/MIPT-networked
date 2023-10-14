@@ -1,18 +1,30 @@
 #pragma once
 #include <cstdint>
+#include <vector>
+#include "quantisation.h"
 
-constexpr uint16_t invalid_entity = -1;
-struct Entity
+enum MoveDirection : uint8_t
 {
-  uint32_t color = 0xff00ffff;
-  float x = 0.f;
-  float y = 0.f;
-  float speed = 0.f;
-  float ori = 0.f;
-  float thr = 0.f;
-  float steer = 0.f;
-  uint16_t eid = invalid_entity;
+	UP,
+	DOWN,
+	LEFT,
+	RIGHT
 };
 
-void simulate_entity(Entity &e, float dt);
+MoveDirection opposite(MoveDirection dir);
 
+constexpr uint16_t invalid_entity = -1;
+constexpr uint16_t server_entity = 0;
+struct Entity
+{
+	uint32_t color = 0xff00ffff;
+	uint16_t eid = invalid_entity;
+
+	vec2int posHead;
+	MoveDirection dir = RIGHT;
+
+	uint8_t length = 1;
+};
+void simulate_entity(Entity &e, std::pair<uint16_t, uint8_t> p);
+vec2int move(vec2int pos, MoveDirection dir);
+void respawn(Entity& e);
