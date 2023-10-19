@@ -70,11 +70,11 @@ void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
   send_cipher_key(peer, *keyPtr);
 }
 
-void on_input(ENetPacket *packet)
+void on_input(ENetPacket *packet, ENetPeer* peer)
 {
   uint16_t eid = invalid_entity;
   MoveDirection dir;
-  deserialize_entity_input(packet, eid, dir);
+  deserialize_entity_input(packet, eid, dir, peer);
   for (Entity &e : entities)
     if (e.eid == eid)
     {
@@ -145,8 +145,8 @@ int main(int argc, const char **argv)
             on_join(event.packet, event.peer, server);
             break;
           case E_CLIENT_TO_SERVER_INPUT:
-            decipher_data(event.packet, event.peer);
-            on_input(event.packet);
+            //decipher_data(event.packet, event.peer);
+            on_input(event.packet, event.peer);
             break;
         };
         enet_packet_destroy(event.packet);

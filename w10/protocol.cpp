@@ -67,17 +67,18 @@ void fuzz_packet_data(ENetPacket *packet)
 
 void send_entity_input(ENetPeer* peer, uint16_t eid, MoveDirection dir)
 {
-    ENetPacket* packet = enet_packet_create(nullptr, sizeof(uint8_t) + sizeof(uint16_t) +
+    ENetPacket* packet = enet_packet_create(nullptr, sizeof(uint8_t) + sizeof(uint32_t) + sizeof(uint16_t) +
         sizeof(MoveDirection),
         //sizeof(uint8_t),
         ENET_PACKET_FLAG_UNSEQUENCED);
     Bitstream bs(packet->data);
     bs.writeRaw(E_CLIENT_TO_SERVER_INPUT);
+    bs.writeRaw(xorCipherKey);
     bs.writeRaw(eid);
     bs.writeRaw(dir);
 
     //fuzz_packet_data(packet);
-    cipher_data(packet);
+    //cipher_data(packet);
 
     enet_peer_send(peer, 1, packet);
 }
@@ -165,13 +166,20 @@ void decipher_data(ENetPacket *packet, ENetPeer *peer)
   xor_packet_data(packet, (uint8_t*)peer->data);
 }
 
-void deserialize_entity_input(ENetPacket* packet, uint16_t& eid, MoveDirection& dir)
+void deserialize_entity_input(ENetPacket* packet, uint16_t& eid, MoveDirection& dir, ENetPeer* peer)
 {
     Bitstream bs(packet->data);
     MessageType mt;
+    uint32_t cipher;
     bs.readRaw(mt);
-    bs.readRaw(eid);
-    bs.readRaw(dir);
+    bs.readRaw(cipher);
+    if (cipher == *(uint32_t*)peer->data)
+    {
+        bs.readRaw(eid);
+        bs.readRaw(dir);
+    }
+    else
+        eid = invalid_entity;
 }
 
 void deserialize_snapshot(ENetPacket* packet, uint16_t& eid, uint8_t& len, vec2int&pos, MoveDirection& dir)

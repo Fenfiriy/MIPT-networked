@@ -26,7 +26,7 @@ MessageType get_packet_type(ENetPacket *packet);
 
 void deserialize_new_entity(ENetPacket *packet, Entity &ent);
 void deserialize_set_controlled_entity(ENetPacket *packet, uint16_t &eid);
-void deserialize_entity_input(ENetPacket* packet, uint16_t& eid, MoveDirection& dir);
+void deserialize_entity_input(ENetPacket* packet, uint16_t& eid, MoveDirection& dir, ENetPeer* peer);
 void deserialize_snapshot(ENetPacket* packet, uint16_t& eid, uint8_t& len, vec2int& pos, MoveDirection& dir);
 void deserialize_state(ENetPacket* packet, std::vector<std::vector<std::pair<uint16_t, uint8_t>>>& fs);
 void deserialize_and_set_key(ENetPacket *packet);
