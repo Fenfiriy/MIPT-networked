@@ -1,30 +1,5 @@
 #include "raylib.h"
-#include <enet/enet.h>
-#include <iostream>
-
-void send_fragmented_packet(ENetPeer *peer)
-{
-  const char *baseMsg = "Stay awhile and listen. ";
-  const size_t msgLen = strlen(baseMsg);
-
-  const size_t sendSize = 2500;
-  char *hugeMessage = new char[sendSize];
-  for (size_t i = 0; i < sendSize; ++i)
-    hugeMessage[i] = baseMsg[i % msgLen];
-  hugeMessage[sendSize-1] = '\0';
-
-  ENetPacket *packet = enet_packet_create(hugeMessage, sendSize, ENET_PACKET_FLAG_RELIABLE);
-  enet_peer_send(peer, 0, packet);
-
-  delete[] hugeMessage;
-}
-
-void send_micro_packet(ENetPeer *peer)
-{
-  const char *msg = "dv/dt";
-  ENetPacket *packet = enet_packet_create(msg, strlen(msg) + 1, ENET_PACKET_FLAG_UNSEQUENCED);
-  enet_peer_send(peer, 1, packet);
-}
+#include "common.h"
 
 int main(int argc, const char **argv)
 {
@@ -36,91 +11,185 @@ int main(int argc, const char **argv)
   const int scrHeight = GetMonitorHeight(0);
   if (scrWidth < width || scrHeight < height)
   {
-    width = std::min(scrWidth, width);
-    height = std::min(scrHeight - 150, height);
-    SetWindowSize(width, height);
+	width = std::min(scrWidth, width);
+	height = std::min(scrHeight - 150, height);
+	SetWindowSize(width, height);
   }
 
   SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
 
   if (enet_initialize() != 0)
   {
-    printf("Cannot init ENet");
-    return 1;
+	printf("Cannot init ENet");
+	return 1;
   }
 
-  ENetHost *client = enet_host_create(nullptr, 1, 2, 0, 0);
+  ENetHost *client = enet_host_create(nullptr, 2, 3, 0, 0);
   if (!client)
   {
-    printf("Cannot create ENet client\n");
-    return 1;
+	printf("Cannot create ENet client\n");
+	return 1;
   }
 
-  ENetAddress address;
-  enet_address_set_host(&address, "localhost");
-  address.port = 10887;
+  ENetAddress lobbyAddress;
+  enet_address_set_host(&lobbyAddress, LOBBY_NAME.c_str());
+  lobbyAddress.port = LOBBY_PORT;
 
-  ENetPeer *lobbyPeer = enet_host_connect(client, &address, 2, 0);
+  ENetPeer *lobbyPeer = enet_host_connect(client, &lobbyAddress, 2, 0);
   if (!lobbyPeer)
   {
-    printf("Cannot connect to lobby");
-    return 1;
+	printf("Cannot connect to lobby");
+	return 1;
   }
 
-  uint32_t timeStart = enet_time_get();
-  uint32_t lastFragmentedSendTime = timeStart;
-  uint32_t lastMicroSendTime = timeStart;
-  bool connected = false;
+  bool connected_lobby = false;
+  bool connected_server = false;
   float posx = 0.f;
   float posy = 0.f;
+  int player_id = -1;
+  std::string player_name = "";
+
+
+  std::vector<std::pair<std::string, int>> players = {};
+
+  ENetAddress serverAddress;
+  ENetPeer* serverPeer;
+
+  std::string status = "Connecting to lobby...";
+
   while (!WindowShouldClose())
   {
-    const float dt = GetFrameTime();
-    ENetEvent event;
-    while (enet_host_service(client, &event, 10) > 0)
-    {
-      switch (event.type)
-      {
-      case ENET_EVENT_TYPE_CONNECT:
-        printf("Connection with %x:%u established\n", event.peer->address.host, event.peer->address.port);
-        connected = true;
-        break;
-      case ENET_EVENT_TYPE_RECEIVE:
-        printf("Packet received '%s'\n", event.packet->data);
-        enet_packet_destroy(event.packet);
-        break;
-      default:
-        break;
-      };
-    }
-    if (connected)
-    {
-      uint32_t curTime = enet_time_get();
-      if (curTime - lastFragmentedSendTime > 1000)
-      {
-        lastFragmentedSendTime = curTime;
-        send_fragmented_packet(lobbyPeer);
-      }
-      if (curTime - lastMicroSendTime > 100)
-      {
-        lastMicroSendTime = curTime;
-        send_micro_packet(lobbyPeer);
-      }
-    }
-    bool left = IsKeyDown(KEY_LEFT);
-    bool right = IsKeyDown(KEY_RIGHT);
-    bool up = IsKeyDown(KEY_UP);
-    bool down = IsKeyDown(KEY_DOWN);
-    constexpr float spd = 10.f;
-    posx += ((left ? -1.f : 0.f) + (right ? 1.f : 0.f)) * dt * spd;
-    posy += ((up ? -1.f : 0.f) + (down ? 1.f : 0.f)) * dt * spd;
+	const float dt = GetFrameTime();
+	ENetEvent event;
+	while (enet_host_service(client, &event, 10) > 0)
+	{
+	  switch (event.type)
+	  {
+	  case ENET_EVENT_TYPE_CONNECT:
+		printf("Connection with %x:%u established\n", event.peer->address.host, event.peer->address.port);
+		if (event.peer->address.port == LOBBY_PORT)
+		{
+			status = "Connected to lobby, press ENTER to start";
+			connected_lobby = true;
+		}
+		else
+		{
+			status = "Connected to server";
+			connected_server = true;
+		}
+		break;
+	  case ENET_EVENT_TYPE_RECEIVE:
+	  {
+		std::string msg((char*)event.packet->data);
+		std::string code = msg.substr(0, msg.find(": "));
+		printf("Received packet type %s\n", msg.c_str());
+		msg = msg.substr(msg.find("\n") + 1);
+		switch (atoi(code.c_str()))
+		{
+		case 0:
+			enet_address_set_host(&serverAddress, msg.substr(0, msg.find(':')).c_str());
+			serverAddress.port = atoi(msg.substr(msg.find(':') + 1).c_str());
+			serverPeer = enet_host_connect(client, &serverAddress, 2, 0);
 
-    BeginDrawing();
-      ClearBackground(BLACK);
-      DrawText(TextFormat("Current status: %s", "unknown"), 20, 20, 20, WHITE);
-      DrawText(TextFormat("My position: (%d, %d)", (int)posx, (int)posy), 20, 40, 20, WHITE);
-      DrawText("List of players:", 20, 60, 20, WHITE);
-    EndDrawing();
+			if (!serverPeer)
+			{
+				printf("Cannot connect to server");
+				status = "Cannot connect to server, try again later";
+			}
+			break;
+		case 1:
+			player_id = atoi(msg.substr(0, msg.find(' ')).c_str());
+			player_name = msg.substr(msg.find(' ') + 1);
+			break;
+		case 2:
+		{
+			int players_count = atoi(msg.substr(0, msg.find('\n')).c_str());
+			msg = msg.substr(msg.find('\n') + 1);
+			for (int i = 0; i < players_count; i++)
+			{
+				int id = atoi(msg.substr(0, msg.find(' ')).c_str());
+				msg = msg.substr(msg.find(' ') + 1);
+				std::string name = msg.substr(0, msg.find('\n'));
+				msg = msg.substr(msg.find('\n') + 1);
+				
+				players.push_back({name, 0});
+				if (players.size() - 1 != id)
+				{
+					printf("We casually broke ids, no biggie\n");
+				}
+			}
+			break;
+		}
+		case 3:
+		{
+			int id = atoi(msg.substr(0, msg.find(' ')).c_str());
+			std::string name = msg.substr(msg.find(' ') + 1);
+
+			
+			if (id >= players.size())
+			{
+				players.push_back({ name, 0 });
+			}
+			break;
+		}
+		case 4:
+		{
+			for (int i = 0; i < players.size(); i++)
+			{
+				int id = atoi(msg.substr(0, msg.find(' ')).c_str());
+				int ping = atoi(msg.substr(msg.find(' ') + 1).c_str());
+				players[id].second = ping;
+			}
+			break;
+		}
+		default:
+			break;
+		}
+		enet_packet_destroy(event.packet);
+		break;
+	  }
+	  default:
+		break;
+	  };
+	}
+	if (connected_lobby && !connected_server && IsKeyDown(KEY_ENTER))
+	{
+		send_string(lobbyPeer, "0: Start game\n");
+		status = "Connecting to server...";
+	}
+
+	if (connected_server)
+	{	  
+	  bool left = IsKeyDown(KEY_LEFT);
+	  bool right = IsKeyDown(KEY_RIGHT);
+	  bool up = IsKeyDown(KEY_UP);
+	  bool down = IsKeyDown(KEY_DOWN);
+	  constexpr float spd = 10.f;
+	  posx += ((left ? -1.f : 0.f) + (right ? 1.f : 0.f)) * dt * spd;
+	  posy += ((up ? -1.f : 0.f) + (down ? 1.f : 0.f)) * dt * spd;
+	  send_string(serverPeer, TextFormat("1: Position\n%f %f", posx, posy));
+	}
+
+	int row = 0;
+
+	BeginDrawing();
+	  ClearBackground(BLACK);
+	  DrawText(TextFormat("Current status: %s", status.c_str()), 20, 20 * ++row, 20, WHITE);
+	  if (connected_server)
+	  {
+		  DrawText(TextFormat("My position: (%d, %d)", (int)posx, (int)posy), 20, 20 * ++row, 20, WHITE);
+		  DrawText("List of players:", 20, 20 * ++row, 20, WHITE);
+		  DrawText("ID", 20, 20 * ++row, 20, WHITE);
+		  DrawText("Name", 100, 20 * row, 20, WHITE);
+		  DrawText("Ping", 280, 20 * row, 20, WHITE);
+		  for (int i = 0; i < players.size(); i++)
+		  {
+			  DrawText(TextFormat("%d", i), 20, 20 * ++row, 20, WHITE);
+			  DrawText((players[i].first + (i == player_id ? " (you)" : "")).c_str(), 100, 20 * row, 20, WHITE);
+			  DrawText(TextFormat("%d", players[i].second), 280, 20 * row, 20, WHITE);
+		  }
+	  }
+	EndDrawing();
   }
   return 0;
 }
