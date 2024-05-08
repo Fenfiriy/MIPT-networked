@@ -31,7 +31,6 @@ void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
 
   controlledMap[newEid] = peer;
 
-
   // send info about new entity to everyone
   for (size_t i = 0; i < host->peerCount; ++i)
     send_new_entity(&host->peers[i], ent);
@@ -72,7 +71,7 @@ int main(int argc, const char **argv)
     return 1;
   }
 
-  constexpr int numAi = 1;
+  constexpr int numAi = 10;
 
   for (int i = 0; i < numAi; ++i)
   {
@@ -128,10 +127,7 @@ int main(int argc, const char **argv)
           e.targetY = (rand() % 40 - 20) * 15.f;
         }
       }
-    }
 
-    for (auto& [k, e] : entities)
-    {
       for (size_t i = 0; i < server->peerCount; ++i)
       {
         ENetPeer *peer = &server->peers[i];
@@ -139,6 +135,7 @@ int main(int argc, const char **argv)
           send_snapshot(peer, e.eid, e.x, e.y, e.radius);
       }
     }
+
     //usleep(400000);
   }
 
