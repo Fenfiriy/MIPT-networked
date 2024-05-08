@@ -11,12 +11,12 @@ SET(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(W4_SOURCES
     main.cpp
     protocol.cpp
-    )
+     "bitstream.h")
 
 set(W4_SERVER_SOURCES
     server.cpp
     protocol.cpp
-    )
+     "bitstream.h")
 
 
 include_directories("../3rdParty/enet/include")
