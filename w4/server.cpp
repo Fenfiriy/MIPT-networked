@@ -3,30 +3,26 @@
 #include "entity.h"
 #include "protocol.h"
 #include <stdlib.h>
-#include <vector>
 #include <map>
 
-static std::vector<Entity> entities;
+static std::map<uint16_t, Entity> entities;
 static std::map<uint16_t, ENetPeer*> controlledMap;
 
 static uint16_t create_random_entity()
 {
   uint16_t newEid = entities.size();
-  uint32_t color = 0xff000000 +
-                   0x00440000 * (1 + rand() % 4) +
-                   0x00004400 * (1 + rand() % 4) +
-                   0x00000044 * (1 + rand() % 4);
+  uint32_t color = (int((rand() % 120 + 120)) << 24) + (int((rand() % 120 + 120)) << 16) + (int(rand() % 120 + 120) << 8) + 255;
   float x = (rand() % 40 - 20) * 5.f;
   float y = (rand() % 40 - 20) * 5.f;
   Entity ent = {color, x, y, newEid, false, 0.f, 0.f};
-  entities.push_back(ent);
+  entities.emplace(newEid, ent);
   return newEid;
 }
 
 void on_join(ENetPacket *packet, ENetPeer *peer, ENetHost *host)
 {
   // send all entities
-  for (const Entity &ent : entities)
+  for (const auto& [k, ent] : entities)
     send_new_entity(peer, ent);
 
   // find max eid
@@ -47,13 +43,13 @@ void on_state(ENetPacket *packet)
 {
   uint16_t eid = invalid_entity;
   float x = 0.f; float y = 0.f;
-  deserialize_entity_state(packet, eid, x, y);
-  for (Entity &e : entities)
-    if (e.eid == eid)
-    {
-      e.x = x;
-      e.y = y;
-    }
+  float r = 0.f;
+  deserialize_entity_state(packet, eid, x, y, r);
+
+  auto &e = entities.find(eid)->second;
+  e.x = x;
+  e.y = y;
+  e.radius = r;
 }
 
 int main(int argc, const char **argv)
@@ -76,7 +72,7 @@ int main(int argc, const char **argv)
     return 1;
   }
 
-  constexpr int numAi = 10;
+  constexpr int numAi = 1;
 
   for (int i = 0; i < numAi; ++i)
   {
@@ -115,7 +111,7 @@ int main(int argc, const char **argv)
         break;
       };
     }
-    for (Entity &e : entities)
+    for (auto& [k, e] : entities)
     {
       if (e.serverControlled)
       {
@@ -133,13 +129,14 @@ int main(int argc, const char **argv)
         }
       }
     }
-    for (const Entity &e : entities)
+
+    for (auto& [k, e] : entities)
     {
       for (size_t i = 0; i < server->peerCount; ++i)
       {
         ENetPeer *peer = &server->peers[i];
         if (controlledMap[e.eid] != peer)
-          send_snapshot(peer, e.eid, e.x, e.y);
+          send_snapshot(peer, e.eid, e.x, e.y, e.radius);
       }
     }
     //usleep(400000);

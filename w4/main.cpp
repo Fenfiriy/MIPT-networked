@@ -3,23 +3,21 @@
 #include "raylib.h"
 #include <enet/enet.h>
 
-#include <vector>
+#include <map>
 #include "entity.h"
 #include "protocol.h"
 
 
-static std::vector<Entity> entities;
+static std::map<uint16_t, Entity> entities;
 static uint16_t my_entity = invalid_entity;
 
 void on_new_entity_packet(ENetPacket *packet)
 {
   Entity newEntity;
   deserialize_new_entity(packet, newEntity);
-  // TODO: Direct adressing, of course!
-  for (const Entity &e : entities)
-    if (e.eid == newEntity.eid)
-      return; // don't need to do anything, we already have entity
-  entities.push_back(newEntity);
+  if (entities.contains(newEntity.eid))
+    return; // don't need to do anything, we already have entity
+  entities.emplace(newEntity.eid, newEntity);
 }
 
 void on_set_controlled_entity(ENetPacket *packet)
@@ -31,14 +29,13 @@ void on_snapshot(ENetPacket *packet)
 {
   uint16_t eid = invalid_entity;
   float x = 0.f; float y = 0.f;
-  deserialize_snapshot(packet, eid, x, y);
-  // TODO: Direct adressing, of course!
-  for (Entity &e : entities)
-    if (e.eid == eid)
-    {
-      e.x = x;
-      e.y = y;
-    }
+  float r = 0.f;
+  deserialize_snapshot(packet, eid, x, y, r);
+
+  auto &e = entities.find(eid)->second;
+  e.x = x;
+  e.y = y;
+  e.radius = r;
 }
 
 int main(int argc, const char **argv)
@@ -117,6 +114,7 @@ int main(int argc, const char **argv)
           on_snapshot(event.packet);
           break;
         };
+        enet_packet_destroy(event.packet);
         break;
       default:
         break;
@@ -128,27 +126,23 @@ int main(int argc, const char **argv)
       bool right = IsKeyDown(KEY_RIGHT);
       bool up = IsKeyDown(KEY_UP);
       bool down = IsKeyDown(KEY_DOWN);
-      // TODO: Direct adressing, of course!
-      for (Entity &e : entities)
-        if (e.eid == my_entity)
-        {
-          // Update
-          e.x += ((left ? -dt : 0.f) + (right ? +dt : 0.f)) * 100.f;
-          e.y += ((up ? -dt : 0.f) + (down ? +dt : 0.f)) * 100.f;
+      auto &e = entities.find(my_entity)->second;
+     
+      // Update
+      e.x += ((left ? -dt : 0.f) + (right ? +dt : 0.f)) * 100.f;
+      e.y += ((up ? -dt : 0.f) + (down ? +dt : 0.f)) * 100.f;
 
-          // Send
-          send_entity_state(serverPeer, my_entity, e.x, e.y);
-        }
+      // Send
+      send_entity_state(serverPeer, my_entity, e.x, e.y, e.radius);
     }
 
 
     BeginDrawing();
       ClearBackground(GRAY);
       BeginMode2D(camera);
-        for (const Entity &e : entities)
+        for (auto &[k, e] : entities)
         {
-          const Rectangle rect = {e.x, e.y, 10.f, 10.f};
-          DrawRectangleRec(rect, GetColor(e.color));
+            DrawCircle(e.x, e.y, e.radius, GetColor(e.color));
         }
 
       EndMode2D();
