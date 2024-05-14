@@ -2,22 +2,26 @@
 #include <algorithm> // min/max
 #include "raylib.h"
 #include <enet/enet.h>
-
+#include <string>
 #include <map>
 #include "entity.h"
 #include "protocol.h"
 
 
 static std::map<uint16_t, Entity> entities;
+static std::map<uint16_t, std::pair<std::string, int>> players;
 static uint16_t my_entity = invalid_entity;
 
 void on_new_entity_packet(ENetPacket *packet)
 {
+  std::string name = "";
   Entity newEntity;
-  deserialize_new_entity(packet, newEntity);
+  deserialize_new_entity(packet, newEntity, name);
   if (entities.contains(newEntity.eid))
     return; // don't need to do anything, we already have entity
   entities.emplace(newEntity.eid, newEntity);
+  players.emplace(newEntity.eid, std::make_pair(name, 0));
+  printf("new entity %d\n%s", newEntity.eid, name.c_str());
 }
 
 void on_set_controlled_entity(ENetPacket *packet)
@@ -29,13 +33,24 @@ void on_snapshot(ENetPacket *packet)
 {
   uint16_t eid = invalid_entity;
   float x = 0.f; float y = 0.f;
-  float r = 0.f;
-  deserialize_snapshot(packet, eid, x, y, r);
+  deserialize_snapshot(packet, eid, x, y);
 
   auto &e = entities.find(eid)->second;
   e.x = x;
   e.y = y;
+}
+
+void on_update(ENetPacket* packet)
+{
+  uint16_t eid = invalid_entity;
+  float points = 0.f;
+  float r = 0.f;
+  deserialize_update(packet, eid, r, points);
+
+  auto &e = entities.find(eid)->second;
+  auto &p = players.find(eid)->second;
   e.radius = r;
+  p.second = points;
 }
 
 int main(int argc, const char **argv)
@@ -104,15 +119,19 @@ int main(int argc, const char **argv)
         {
         case E_SERVER_TO_CLIENT_NEW_ENTITY:
           on_new_entity_packet(event.packet);
-          printf("new it\n");
+          printf("new ent\n");
           break;
         case E_SERVER_TO_CLIENT_SET_CONTROLLED_ENTITY:
           on_set_controlled_entity(event.packet);
-          printf("got it\n");
+          printf("ctrl ent\n");
           break;
         case E_SERVER_TO_CLIENT_SNAPSHOT:
           on_snapshot(event.packet);
           break;
+        case E_SERVER_TO_CLIENT_UPDATE:
+          on_update(event.packet);
+          printf("upd ent\n");
+		  break;
         };
         enet_packet_destroy(event.packet);
         break;
@@ -133,13 +152,22 @@ int main(int argc, const char **argv)
       e.y += ((up ? -dt : 0.f) + (down ? +dt : 0.f)) * 100.f;
 
       // Send
-      send_entity_state(serverPeer, my_entity, e.x, e.y, e.radius);
+      send_entity_state(serverPeer, my_entity, e.x, e.y);
     }
 
+    int row = -5;
 
     BeginDrawing();
       ClearBackground(GRAY);
       BeginMode2D(camera);
+        DrawText("List of players:", 20, 20 * ++row, 20, WHITE);
+        DrawText("Name", 20, 20 * ++row, 20, WHITE);
+        DrawText("Points", 150, 20 * row, 20, WHITE);
+        for (auto &[i, np] : players)
+        {
+          DrawText((np.first + (i == my_entity ? " (you)" : "")).c_str(), 20, 20 * ++row, 20, GetColor(entities[i].color));
+          DrawText(TextFormat("%d", np.second), 150, 20 * row, 20, WHITE);
+        }
         for (auto &[k, e] : entities)
         {
             DrawCircle(e.x, e.y, e.radius, GetColor(e.color));

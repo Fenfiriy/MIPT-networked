@@ -12,6 +12,6 @@ struct Entity
   float targetX = 0.f;
   float targetY = 0.f;
 
-  float radius = 10.f;
+  float radius = 5.f;
 };
 
